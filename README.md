@@ -1,5 +1,8 @@
 # AWS S3 Versioned Cleanup Script
 
+![image](https://github.com/KlimDos/delete-s3-versions-and-markers/assets/17221993/2a0c2f23-15f7-42ab-b6a2-c33313a0642d)
+
+
 This Python script is designed to delete 'old object versions' and 'delete markers' from an AWS S3 bucket with versioning enabled. 
 
 ## Prerequisites:
