@@ -1,6 +1,6 @@
 import boto3
 
-BUCKET_NAME = 'insert s3 bucket name'
+BUCKET_NAME = 'YOUR_BUCKET_NAME'
 
 s3_client = boto3.client('s3')
 
