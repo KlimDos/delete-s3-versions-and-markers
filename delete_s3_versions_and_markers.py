@@ -1,18 +1,17 @@
+import os
 import boto3
 from botocore.exceptions import ClientError
-
-# Configuration
-BUCKET_NAME = 'YOUR_BUCKET_NAME'
-BATCH_SIZE = 1000  # Maximum number of objects to delete in a single API call
+import argparse
 
 # Initialize S3 client
 s3_client = boto3.client('s3')
 
-def delete_objects(objects_to_delete):
+def delete_objects(bucket_name, objects_to_delete):
     """
     Delete a batch of objects from the S3 bucket.
     
     Args:
+    bucket_name (str): Name of the S3 bucket.
     objects_to_delete (list): List of dictionaries containing 'Key' and 'VersionId' of objects to delete.
     
     Returns:
@@ -23,7 +22,7 @@ def delete_objects(objects_to_delete):
 
     try:
         response = s3_client.delete_objects(
-            Bucket=BUCKET_NAME,
+            Bucket=bucket_name,
             Delete={'Objects': objects_to_delete}
         )
         deleted_count = len(response.get('Deleted', []))
@@ -39,11 +38,12 @@ def delete_objects(objects_to_delete):
         print(f"Error occurred: {e}")
         return 0
 
-def list_and_delete_objects(delete_existing=False):
+def list_and_delete_objects(bucket_name, delete_existing=False):
     """
     List and delete objects (including versions and delete markers) from the S3 bucket.
     
     Args:
+    bucket_name (str): Name of the S3 bucket.
     delete_existing (bool): If True, delete all versions including the latest. If False, keep the latest version.
     
     Returns:
@@ -53,7 +53,7 @@ def list_and_delete_objects(delete_existing=False):
     total_deleted = 0
     objects_to_delete = []
 
-    for page in paginator.paginate(Bucket=BUCKET_NAME):
+    for page in paginator.paginate(Bucket=bucket_name):
         # Process object versions
         for version in page.get('Versions', []):
             if delete_existing or not version['IsLatest']:
@@ -70,14 +70,14 @@ def list_and_delete_objects(delete_existing=False):
             })
         
         # Delete objects in batches
-        if len(objects_to_delete) >= BATCH_SIZE:
-            total_deleted += delete_objects(objects_to_delete[:BATCH_SIZE])
-            objects_to_delete = objects_to_delete[BATCH_SIZE:]
+        if len(objects_to_delete) >= 1000:
+            total_deleted += delete_objects(bucket_name, objects_to_delete[:1000])
+            objects_to_delete = objects_to_delete[1000:]
             print(f"Total deleted so far: {total_deleted}")
 
     # Delete any remaining objects
     if objects_to_delete:
-        total_deleted += delete_objects(objects_to_delete)
+        total_deleted += delete_objects(bucket_name, objects_to_delete)
 
     return total_deleted
 
@@ -85,9 +85,19 @@ def main():
     """
     Main function to run the S3 object deletion script.
     """
+    parser = argparse.ArgumentParser(description="Delete objects from an S3 bucket.")
+    parser.add_argument("--delete_existing", type=bool, default=os.getenv("DELETE_EXISTING", "False") == "True", 
+                        help="Delete all versions including the latest.")
+    parser.add_argument("--bucket_name", type=str, default=os.getenv("BUCKET_NAME"), 
+                        help="Name of the S3 bucket.")
+    args = parser.parse_args()
+
+    if not args.bucket_name:
+        print("Error: Bucket name must be provided either as an environment variable or argument.")
+        return
+
     try:
-        delete_existing = input("Do you want to delete existing objects? (y/n): ").lower() == 'y'
-        total_deleted = list_and_delete_objects(delete_existing)
+        total_deleted = list_and_delete_objects(args.bucket_name, args.delete_existing)
         print(f"Total objects deleted: {total_deleted}")
     except KeyboardInterrupt:
         print("\nOperation interrupted by user. Exiting...")
